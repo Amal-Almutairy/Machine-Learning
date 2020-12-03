@@ -35,16 +35,17 @@ library(dplyr)
 library(recipes)
 library(ggvis)
 library(vip) 
+library(readr)
 ```
 
 ## Restaurant Scores - LIVES Standard
+
 ```{r}
 # Read the data:
-library(readr)
 Rscore <- read_csv("Restaurant_Scores_-_LIVES_Standard.csv", 
     col_types = cols(business_id = col_number(), 
         violation_id = col_number()))
-View(Rscore)
+
 Rscore = na.omit(Rscore)
 ```
 
