@@ -1,0 +1,177 @@
+---
+title: "Restaurant Scores - LIVES Standard"
+author: "Amal Almutairy"
+date: "11-10-2020"
+output: 
+  html_document:
+    theme: journal
+    highlight: tango
+    toc: true
+    toc_depth: 4
+    toc_float:
+      collapsed: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Health And Social Services
+After conducting an inspection of the facility, the Health Inspector calculates a score based on the violations observed.The score card data is avilible to the puplic in Health And Social Services websit: `https://data.sfgov.org/Health-and-Social-Services/Restaurant-Scores-LIVES-Standard/pyih-qa8i?row_index=0`
+
+```{r}
+# Packages required
+library(rsample)
+library(caret)
+library(tidyverse)
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(recipes)
+library(ggvis)
+library(frequency)
+install.packages("ROCR")
+library(vip) 
+```
+
+## Restaurant Scores - LIVES Standard
+```{r}
+# Read the data:
+library(readr)
+Rscore <- read_csv("Restaurant_Scores_-_LIVES_Standard.csv", 
+    col_types = cols(business_id = col_number(), 
+        violation_id = col_number()))
+View(Rscore)
+Rscore = na.omit(Rscore)
+```
+
+# Exploratory Data Analysis
+```{r}
+# EDA
+str(Rscore)
+summary(Rscore)
+class(Rscore)
+head(Rscore)
+glimpse(Rscore)
+```
+
+# Inspection Score Density Spread
+```{r}
+summary(Rscore$inspection_score)
+
+
+# Plot
+hist(Rscore$inspection_score)
+plot(density(Rscore$inspection_score), main="Inspection Score Density Spread")
+```
+# Risk Category Rates 
+```{r}
+summary(Rscore$risk_category)
+
+# Plot
+ggplot(Rscore, aes(x = risk_category)) +
+  theme_bw() +
+  geom_bar() +
+  labs(y = "Violations count",
+       title = "Risk Category Rates")
+
+```
+
+```{r}
+# split, train and test the data 
+set.seed(123) # for reproducibility
+split <- initial_split(Rscore, strata = "inspection_score", prop = 0.7)
+train <- training(split)
+test  <- testing(split) 
+
+
+# Do the distributions line up? 
+ggplot(train, aes(x = inspection_score)) + 
+  geom_line(stat = "density", 
+            trim = TRUE) + 
+  geom_line(data = test, 
+            stat = "density", 
+            trim = TRUE, col = "red")
+```
+## Feature engineering
+```{r}
+visdat::vis_miss(Rscore, cluster = TRUE)
+
+caret::nearZeroVar(Rscore, saveMetrics= TRUE) %>% 
+  rownames_to_column() %>% 
+  filter(nzv)
+```
+
+
+```{r}
+
+# 1. stratified sampling with the rsample package
+set.seed(1234)
+split  <- initial_split(Rscore, prop = 0.7, strata = "inspection_score")
+rtrain  <- training(split)
+rtest   <- testing(split)
+
+# 2. Feature engineering
+blueprint <- recipe(inspection_score ~ business_id, data = Rscore) %>%
+  step_nzv(all_nominal()) %>%
+  step_integer(matches("Qual|Cond|QC|Qu")) %>%
+  step_center(all_numeric(), -all_outcomes()) %>%
+  step_scale(all_numeric(), -all_outcomes()) %>%
+  step_dummy(all_nominal(), -all_outcomes(), one_hot = TRUE)
+
+# prepare blueprint
+prepare <- prep(blueprint, training = Rscore)
+prepare
+
+# Bake
+baked_train <- bake(prepare, new_data = Rscore)
+baked_test <- bake(prepare, new_data = Rscore)
+
+baked_train
+```
+
+
+```{r}
+
+# 3. create a re-sampling method
+cv <- trainControl(
+  method = "repeatedcv", 
+  number = 10, 
+  repeats = 5
+  )
+ 
+# 4. create a hyperparameter grid search
+hyper_grid <- expand.grid(k = seq(2, 25, by = 1))
+
+# 5. execute grid search with knn model
+#    use RMSE as preferred metric
+knn_fit <- train(
+  blueprint, 
+  data = rtrain, 
+  method = "knn", 
+  trControl = cv, 
+  tuneGrid = hyper_grid,
+  metric = "RMSE"
+  )
+# 6. evaluate results
+# print model results
+knn_fit
+```
+
+
+```{r}
+# 
+ggplot(Rscore, aes(x = inspection_score)) +
+  theme_bw() +  
+  facet_wrap(~ risk_category) +
+  geom_bar() +
+  labs(y = "Violations count",
+       title = "Risk Category Rates by Inspection Score")
+```
+```{r}
+# plot cross validation results
+ggplot(knn_fit$results, aes(k, RMSE)) + 
+  geom_line() +
+  geom_point() +
+  scale_y_continuous(labels = scales::dollar)  
+```
