@@ -2,22 +2,27 @@
 title: "Restaurant Scores - LIVES Standard"
 author: "Amal Almutairy"
 date: "11-10-2020"
-output: 
+output:
   html_document:
     theme: journal
     highlight: tango
-    toc: true
+    toc: yes
     toc_depth: 4
     toc_float:
-      collapsed: false
+      collapsed: no
+  pdf_document:
+    toc: yes
+    toc_depth: '4'
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE) 
 ```
 
 ## Health And Social Services
 After conducting an inspection of the facility, the Health Inspector calculates a score based on the violations observed.The score card data is avilible to the puplic in Health And Social Services websit: `https://data.sfgov.org/Health-and-Social-Services/Restaurant-Scores-LIVES-Standard/pyih-qa8i?row_index=0`
+
+
 
 ```{r}
 # Packages required
@@ -29,8 +34,6 @@ library(ggplot2)
 library(dplyr)
 library(recipes)
 library(ggvis)
-library(frequency)
-install.packages("ROCR")
 library(vip) 
 ```
 
